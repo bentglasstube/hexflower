@@ -1,5 +1,5 @@
 function _random_elem() {
-  return arguments[Math.floor(Math.random(arguments.length))];
+  return arguments[Math.floor(Math.random() * arguments.length)];
 }
 
 class Terrain {
@@ -18,6 +18,10 @@ class Terrain {
 
   static get None() {
     return new Terrain('none');
+  }
+
+  toString() {
+    return this.major + (this.minor ? "." + this.minor : "");
   }
 
   get primary() {
@@ -123,12 +127,12 @@ class Terrain {
   get color() {
     switch (this.major) {
       case 'water':     return '#88f';
-      case 'swamp':     return '#448';
+      case 'swamp':     return '#848';
       case 'desert':    return '#ff8';
       case 'plains':    return '#af8';
       case 'forest':    return '#0b0';
       case 'hills':     return '#dda';
-      case 'mountains': return '#ccc';
+      case 'mountains': return '#aaa';
       case 'none': return '#000';
 
       default:
@@ -142,71 +146,144 @@ class Terrain {
   }
 }
 
+class Direction {
+  constructor(v) {
+    this.value = v;
+  }
+
+  static get NW() { return new Direction('NW'); }
+  static get NE() { return new Direction('NE'); }
+  static get E()  { return new Direction('E');  }
+  static get SW() { return new Direction('SW'); }
+  static get SE() { return new Direction('SE'); }
+  static get W()  { return new Direction('W');  }
+  static get Random() {
+    return new Direction(_random_elem('NW', 'NE', 'E', 'SW', 'SE', 'W'));
+  }
+
+  toString() {
+    return this.value;
+  }
+
+  get opposite() {
+    switch (this.value) {
+      case 'NW': return 'SE';
+      case 'NE': return 'SW';
+      case 'E':  return 'W';
+      case 'SE': return 'NW';
+      case 'SW': return 'NE';
+      case 'W':  return 'E';
+    }
+  }
+}
+
+class MapPoint {
+  constructor(q, r) {
+    this.q = q;
+    this.r = r;
+  }
+
+  toString() {
+    return "(" + this.q + ", " + this.r + ")";
+  }
+
+  get s() {
+    return -this.q - this.r;
+  }
+
+  apply(dir, amount=1) {
+    switch (dir.toString()) {
+      case 'NW': return new MapPoint(this.q,          this.r - amount);
+      case 'NE': return new MapPoint(this.q + amount, this.r - amount);
+      case 'E':  return new MapPoint(this.q + amount, this.r);
+      case 'SE': return new MapPoint(this.q,          this.r + amount);
+      case 'SW': return new MapPoint(this.q - amount, this.r + amount);
+      case 'W':  return new MapPoint(this.q - amount, this.r);
+    }
+  }
+
+  equals(p) {
+    return this.q == p.q && this.r == p.r;
+  }
+
+  dist(p) {
+    return (
+      Math.abs(this.q - p.q) +
+      Math.abs(this.r - p.r) +
+      Math.abs(this.s - p.s)
+    ) / 2;
+  }
+
+  add(p) {
+    return new GridPoint(this.q + p.q, this.r + p.r);
+  }
+
+  subtract(p) {
+    return new GridPoint(this.q - p.q, this.r - p.r);
+  }
+
+  get center() {
+    return {
+      x: this.q * 4 * Map.Scale + this.r * 2 * Map.Scale,
+      y: this.r * 3 * Map.Scale,
+    };
+  }
+}
+
 class Map {
-  static get kTileSize() { return 6; }
+  static get Scale() { return 5; }
 
   constructor() {
     this.map = {};
     this.regions = [];
 
-    this.set(0, 0, new Terrain('plains'));
-    this.fill_region(0, 0);
+    var origin = new MapPoint(0, 0);
+    this.fill_region(origin, new Terrain('plains'));
 
-    for (var i = 0; i < 4; ++i) {
-      this.add_ring(i);
-    }
-  }
+    while (this.regions.length < 26) {
+      var seed = _random_elem(...this.regions);
+      var check = seed.apply(Direction.Random, 5);
 
-  add_ring(n) {
-    const radius = 5 * n;
-    var q = radius;
-    var r = 0;
+      if (check.dist(origin) < 21 && this.get(check).empty) {
+        var n = Math.floor(Math.random() * 12);
+        var t = n < 6 ? this.get(seed).primary :
+          (n < 9 ? this.get(seed).secondary :
+            (n < 11 ? this.get(seed).tertiary :
+              this.get(seed).wildcard));
 
-    var dir = [-5, 5];
-
-    while (true) {
-      if (!this.get(q, r).empty) return;
-
-      if (n < 3 || Math.random() < 1 / n) {
-        this.set_random(q, r);
-        this.fill_region(q, r);
+        this.fill_region(check, t);
       }
-
-      q += dir[0];
-      r += dir[1];
-
-      if (q == 0 && r == radius) dir = [-5, 0];
-      if (q == -radius && r == radius) dir = [0, -5];
-      if (q == -radius && r == 0) dir = [5, -5];
-      if (q == 0 && r == -radius) dir = [5, 0];
-      if (q == radius && r == -radius) dir = [0, 5];
-      if (q == radius && r == 0) break;
     }
   }
 
-  set_random(q, r) {
-    const n = Math.floor(Math.random() * 12);
-    const terrain = new Terrain('plains');
+  fill_region(p, terrain) {
+    this.set(p, terrain);
+    this.regions.push(p);
 
-    if (n < 6) return this.set(q, r, terrain.primary);
-    if (n < 9) return this.set(q, r, terrain.secondary);
-    if (n < 11) return this.set(q, r, terrain.tertiary);
-    this.set(q, r, Terrain.Random);
-  }
-
-  fill_region(q, r) {
-    const terrain = this.get(q, r);
-
-    this.regions.push([q, r]);
+    console.log("Filling region " + p + " (" + terrain + ")");
 
     var full = [
-      [q + 0, r - 2], [q + 1, r - 2], [q + 2, r - 2],
-      [q - 1, r - 1], [q + 0, r - 1], [q + 1, r - 1], [q + 2, r - 1],
-      [q - 2, r + 0], [q - 1, r + 0], [q + 1, r + 0], [q + 2, r + 0],
-      [q - 2, r + 1], [q - 1, r + 1], [q + 0, r + 1], [q + 1, r + 1],
-      [q - 2, r + 2], [q - 1, r + 2], [q + 0, r + 2]
+      new MapPoint(p.q + 0, p.r - 2),
+      new MapPoint(p.q + 1, p.r - 2),
+      new MapPoint(p.q + 2, p.r - 2),
+      new MapPoint(p.q - 1, p.r - 1),
+      new MapPoint(p.q + 0, p.r - 1),
+      new MapPoint(p.q + 1, p.r - 1),
+      new MapPoint(p.q + 2, p.r - 1),
+      new MapPoint(p.q - 2, p.r + 0),
+      new MapPoint(p.q - 1, p.r + 0),
+      new MapPoint(p.q + 1, p.r + 0),
+      new MapPoint(p.q + 2, p.r + 0),
+      new MapPoint(p.q - 2, p.r + 1),
+      new MapPoint(p.q - 1, p.r + 1),
+      new MapPoint(p.q + 0, p.r + 1),
+      new MapPoint(p.q + 1, p.r + 1),
+      new MapPoint(p.q - 2, p.r + 2),
+      new MapPoint(p.q - 1, p.r + 2),
+      new MapPoint(p.q + 0, p.r + 2)
     ];
 
+    // shuffle the array
     var ci = full.length;
     while (ci != 0) {
       var ri = Math.floor(Math.random() * ci);
@@ -218,60 +295,65 @@ class Map {
     }
 
     for (var i = 0; i < full.length; ++i) {
-      if (i < 9) {
-        this.set(full[i][0], full[i][1], terrain.primary);
-      } else if (i < 15) {
-        this.set(full[i][0], full[i][1], terrain.secondary);
-      } else {
-        this.set(full[i][0], full[i][1], terrain.tertiary);
-      }
+      var t = i < 9 ? terrain.primary :
+        (i < 15 ? terrain.secondary :
+          (Math.random() < 0.5 ?
+            terrain.tertiary : terrain.wildcard));
+
+      this.set(full[i], t);
     }
 
     var edges = [
-      [q + 1, r - 3], [q + 2, r - 3],
-      [q - 1, r - 2], [q + 3, r - 2],
-      [q - 2, r - 1], [q + 3, r - 1],
-      [q - 3, r + 1], [q + 2, r + 1],
-      [q - 3, r + 2], [q + 1, r + 2],
-      [q - 2, r + 3], [q - 1, r + 3],
+      new MapPoint(p.q + 1, p.r - 3),
+      new MapPoint(p.q + 2, p.r - 3),
+      new MapPoint(p.q - 1, p.r - 2),
+      new MapPoint(p.q + 3, p.r - 2),
+      new MapPoint(p.q - 2, p.r - 1),
+      new MapPoint(p.q + 3, p.r - 1),
+      new MapPoint(p.q - 3, p.r + 1),
+      new MapPoint(p.q + 2, p.r + 1),
+      new MapPoint(p.q - 3, p.r + 2),
+      new MapPoint(p.q + 1, p.r + 2),
+      new MapPoint(p.q - 2, p.r + 3),
+      new MapPoint(p.q - 1, p.r + 3),
     ];
 
     for (var i = 0; i < edges.length; ++i) {
-      this.set_adjacent(edges[i][0], edges[i][1]);
+      this.set_adjacent(edges[i]);
     }
   }
 
-  set_adjacent(q, r) {
-    if (!this.get(q, r).empty) return;
+  set_adjacent(p) {
+    if (!this.get(p).empty) return;
 
     var adjacent = [
-      [q, r - 1],
-      [q + 1, r - 1],
-      [q - 1, r],
-      [q + 1, r],
-      [q - 1, r + 1],
-      [q, r + 1],
+      new MapPoint(p.q,     p.r - 1),
+      new MapPoint(p.q + 1, p.r - 1),
+      new MapPoint(p.q - 1, p.r),
+      new MapPoint(p.q + 1, p.r),
+      new MapPoint(p.q - 1, p.r + 1),
+      new MapPoint(p.q,     p.r + 1),
     ];
 
     var terrains = [];
     for (var i = 0; i < adjacent.length; ++i) {
-      var t = this.get(adjacent[i][0], adjacent[i][1]);
+      var t = this.get(adjacent[i]);
       if (!t.empty) terrains.push(t);
     }
 
     if (terrains.length > 0) {
       var i = Math.floor(Math.random() * terrains.length);
-      this.set(q, r, terrains[i]);
+      this.set(p, terrains[i]);
     }
   }
 
-  get(q, r) {
-    return this.map[r] && this.map[r][q] || new Terrain('none');
+  get(p) {
+    return this.map[p.r] && this.map[p.r][p.q] || new Terrain('none');
   }
 
-  set(q, r, terrain) {
-    if (!this.map[r]) this.map[r] = {};
-    this.map[r][q] = terrain;
+  set(p, terrain) {
+    if (!this.map[p.r]) this.map[p.r] = {};
+    this.map[p.r][p.q] = terrain;
   }
 
   draw(c) {
@@ -279,56 +361,58 @@ class Map {
 
     for (var r = -99; r <= 99; ++r) {
       for (var q = -99; q <= 99; ++q) {
-        this.draw_cell(context, q, r);
+        this.draw_cell(context, new MapPoint(q, r));
       }
     }
 
     for (var i = 0; i < this.regions.length; ++i) {
-      var re = this.regions[i];
-      this.draw_region(context, re[0], re[1]);
+      this.draw_region(context, this.regions[i]);
     }
   }
 
-  draw_cell(context, q, r) {
-    const cx = q * 4 * Map.kTileSize + r * 2 * Map.kTileSize + 500;
-    const cy = r * 3 * Map.kTileSize + 500;
+  draw_cell(context, p) {
+    const cx = p.q * 4 * Map.Scale + p.r * 2 * Map.Scale + 500;
+    const cy = p.r * 3 * Map.Scale + 500;
 
     context.lineWidth = 1;
     context.strokeStyle = '#000';
-    context.fillStyle = this.get(q, r).color;
+    context.fillStyle = this.get(p).color;
 
     context.beginPath();
-    context.moveTo(cx, cy - 2 * Map.kTileSize);
-    context.lineTo(cx + 2 * Map.kTileSize, cy - Map.kTileSize);
-    context.lineTo(cx + 2 * Map.kTileSize, cy + Map.kTileSize);
-    context.lineTo(cx, cy + 2 * Map.kTileSize);
-    context.lineTo(cx - 2 * Map.kTileSize, cy + Map.kTileSize);
-    context.lineTo(cx - 2 * Map.kTileSize, cy - Map.kTileSize);
+    context.moveTo(cx, cy - 2 * Map.Scale);
+    context.lineTo(cx + 2 * Map.Scale, cy - Map.Scale);
+    context.lineTo(cx + 2 * Map.Scale, cy + Map.Scale);
+    context.lineTo(cx, cy + 2 * Map.Scale);
+    context.lineTo(cx - 2 * Map.Scale, cy + Map.Scale);
+    context.lineTo(cx - 2 * Map.Scale, cy - Map.Scale);
     context.closePath();
 
-    if (Map.kTileSize > 2) context.stroke();
+    if (Map.Scale > 2) context.stroke();
     context.fill();
   }
 
-  draw_region(context, q, r) {
-    const cx = q * 4 * Map.kTileSize + r * 2 * Map.kTileSize + 500;
-    const cy = r * 3 * Map.kTileSize + 500;
+  draw_region(context, p) {
+    const cx = p.q * 4 * Map.Scale + p.r * 2 * Map.Scale + 500;
+    const cy = p.r * 3 * Map.Scale + 500;
 
-    context.lineWidth = Map.kTileSize > 2 ? 3 : 1;
+    context.lineWidth = Map.Scale > 2 ? 2 : 1;
     context.strokeStyle = '#000';
-    context.fillStyle = 'transparent';
 
     context.beginPath();
-    context.moveTo(cx, cy - 10 * Map.kTileSize);
-    context.lineTo(cx + 10 * Map.kTileSize, cy - 5 * Map.kTileSize);
-    context.lineTo(cx + 10 * Map.kTileSize, cy + 5 * Map.kTileSize);
-    context.lineTo(cx, cy + 10 * Map.kTileSize);
-    context.lineTo(cx - 10 * Map.kTileSize, cy + 5 * Map.kTileSize);
-    context.lineTo(cx - 10 * Map.kTileSize, cy - 5 * Map.kTileSize);
+    context.moveTo(cx, cy - 10 * Map.Scale);
+    context.lineTo(cx + 10 * Map.Scale, cy - 5 * Map.Scale);
+    context.lineTo(cx + 10 * Map.Scale, cy + 5 * Map.Scale);
+    context.lineTo(cx, cy + 10 * Map.Scale);
+    context.lineTo(cx - 10 * Map.Scale, cy + 5 * Map.Scale);
+    context.lineTo(cx - 10 * Map.Scale, cy - 5 * Map.Scale);
     context.closePath();
     context.stroke();
   }
 }
 
 var map = new Map();
-map.draw(document.getElementById('c'));
+var draw = function() {
+  map.draw(document.getElementById('c'));
+  window.requestAnimationFrame(draw);
+};
+window.requestAnimationFrame(draw);
