@@ -6,8 +6,14 @@
   </head>
   <body>
     <h1>hexflower world generator</h1>
+    <form id="f">
+      <label for="s">Seed: </label>
+      <input name="seed" id="s">
+      <button type="submit" id="gen">Generate</button>
+    </form>
     <canvas id="c" width="1000" height="1000"></canvas>
     <pre id="data"></pre>
+    <script src="random.js"></script>
     <script src="hexflower.js"></script>
   </body>
 </html>

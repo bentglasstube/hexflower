@@ -6,6 +6,10 @@ body {
   color: #ddd;
 }
 
+form {
+  margin: 1em;
+}
+
 canvas {
   background: #000;
   border: 1px solid #ddd;

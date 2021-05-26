@@ -1,5 +1,5 @@
 function _random_elem() {
-  return arguments[Math.floor(Math.random() * arguments.length)];
+  return arguments[Math.floor(rng.random() * arguments.length)];
 }
 
 class Terrain {
@@ -27,12 +27,12 @@ class Terrain {
   get primary() {
     switch (this.major) {
       case 'forest':
-        return Math.random() < 0.33 ?
+        return rng.random() < 0.33 ?
           new Terrain('forest', 'heavy') :
           new Terrain('forest');
 
       case 'hills':
-        return Math.random() < 0.20 ?
+        return rng.random() < 0.20 ?
           new Terrain('hills', 'canyon') :
           new Terrain('hills');
 
@@ -46,14 +46,14 @@ class Terrain {
       case 'water': return new Terrain('plains', 'beach');
       case 'swamp': return new Terrain('plains');
       case 'desert':
-        return Math.random() < 0.33 ?
+        return rng.random() < 0.33 ?
           new Terrain('hills', 'dunes') :
           new Terrain('hills');
 
       case 'plains': return new Terrain('forest');
       case 'forest': return new Terrain('plains');
       case 'hills':
-        return Math.random() < 0.40 ?
+        return rng.random() < 0.40 ?
           new Terrain('mountains', 'pass') :
           new Terrain('mountains');
 
@@ -66,7 +66,7 @@ class Terrain {
   get tertiary() {
     switch (this.major) {
       case 'water':
-        return Math.random() < 0.66 ?
+        return rng.random() < 0.66 ?
           new Terrain('forest', 'light') :
           new Terrain('forest');
 
@@ -74,13 +74,13 @@ class Terrain {
       case 'desert': return new Terrain('plains');
       case 'plains': return new Terrain('hills');
       case 'forest':
-        return Math.random() < 0.66 ?
+        return rng.random() < 0.66 ?
           new Terrain('forest', 'hills') :
           new Terrain('hills');
 
       case 'hills': return new Terrain('plains');
       case 'mountains':
-        return Math.random() < 0.33 ?
+        return rng.random() < 0.33 ?
           new Terrain('forest', 'mountains') :
           new Terrain('forest');
 
@@ -103,16 +103,16 @@ class Terrain {
         return new Terrain(_random_elem('water', 'swamp', 'desert'));
 
       case 'forest':
-        return Math.random() < 0.66 ?
+        return rng.random() < 0.66 ?
           new Terrain(_random_elem('water', 'swamp')) :
-          Math.random() < 0.66 ?
+          rng.random() < 0.66 ?
             new Terrain('forest', 'mountains') :
             new Terrain('mountains');
 
       case 'hills':
-        return Math.random() < 0.66 ?
+        return rng.random() < 0.66 ?
           new Terrain(_random_elem('water', 'desert')) :
-          Math.random() < 0.33 ?
+          rng.random() < 0.33 ?
             new Terrain('forest', 'hills') :
             new Terrain('forest');
 
@@ -125,7 +125,7 @@ class Terrain {
   }
 
   get related() {
-    const r = Math.random() * 12;
+    const r = rng.random() * 12;
     if (r < 6) return this.primary;
     if (r < 9) return this.secondary;
     if (r < 11) return this.tertiary;
@@ -268,7 +268,7 @@ class Map {
     var check = seed.apply(Direction.Random, 5);
 
     if (check.dist(Map.Origin) < 21 && this.get(check).empty) {
-      var n = Math.floor(Math.random() * 12);
+      var n = Math.floor(rng.random() * 12);
       var t = this.get(seed).related;
       this.fill_region(check, t);
     }
@@ -351,7 +351,7 @@ class Map {
     }
 
     if (terrains.length > 0) {
-      var i = Math.floor(Math.random() * terrains.length);
+      var i = Math.floor(rng.random() * terrains.length);
       this.set(p, terrains[i]);
     }
   }
@@ -423,6 +423,14 @@ class Map {
   }
 }
 
+function getParam(name, def='') {
+  var re = new RegExp('[\\?&]' + name + '=([^&#]*)');
+  var match = re.exec(location.search);
+  return match == null ? def : decodeURIComponent(match[1].replace(/\+/g, ' '));
+}
+
+var seed = getParam('seed', 'hexflower');
+var rng = new Random(seed);
 var map = new Map();
 var draw = function() {
   map.update();
@@ -430,6 +438,9 @@ var draw = function() {
   window.requestAnimationFrame(draw);
 };
 window.requestAnimationFrame(draw);
+
+
+document.getElementById('s').value = seed;
 
 document.getElementById('c').addEventListener('mousemove', function(e) {
   const px = e.pageX - this.offsetLeft - 500;
