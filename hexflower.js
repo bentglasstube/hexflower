@@ -253,8 +253,12 @@ class Map {
     this.regions = [];
 
     this.fill_region(Map.Origin, new Terrain('plains'));
+  }
 
-    while (this.regions.length < 26) {
+  update() {
+    if (this.current_region) {
+      this.fill_region_step();
+    } else if (this.regions.length < 26) {
       this.add_region();
     }
   }
@@ -270,7 +274,7 @@ class Map {
     }
   }
 
-  expand_region(origin) {
+  expand(origin, max_dist) {
     var source = origin;
     var dest = source.apply(Direction.Random);
 
@@ -279,7 +283,7 @@ class Map {
       dest = source.apply(Direction.Random);
     }
 
-    if (dest.dist(origin) > 2) return 0;
+    if (dest.dist(origin) > max_dist) return 0;
 
     this.set(dest, this.get(source).related);
     return 1;
@@ -291,12 +295,10 @@ class Map {
 
     console.log("Filling region " + p + " (" + terrain + ")");
 
-    var count = 1;
-    while (count < 19) {
-      count += this.expand_region(p);
-    }
+    this.current_region = p;
+    this.count = 1;
 
-    var edges = [
+    this.edges = [
       new MapPoint(p.q + 1, p.r - 3),
       new MapPoint(p.q + 2, p.r - 3),
       new MapPoint(p.q - 1, p.r - 2),
@@ -310,10 +312,24 @@ class Map {
       new MapPoint(p.q - 2, p.r + 3),
       new MapPoint(p.q - 1, p.r + 3),
     ];
+  }
 
-    for (var i = 0; i < edges.length; ++i) {
-      this.set_adjacent(edges[i]);
+  fill_region_step() {
+    if (this.count < 19) {
+      while (true) {
+        var added = this.expand(this.current_region, 2);
+        this.count += added;
+
+        if (added) return;
+      }
     }
+
+    if (this.edges.length > 0) {
+      this.set_adjacent(this.edges.pop());
+      return;
+    }
+
+    this.current_region = undefined;
   }
 
   set_adjacent(p) {
@@ -409,6 +425,7 @@ class Map {
 
 var map = new Map();
 var draw = function() {
+  map.update();
   map.draw(document.getElementById('c'));
   window.requestAnimationFrame(draw);
 };
