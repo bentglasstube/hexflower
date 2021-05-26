@@ -124,6 +124,14 @@ class Terrain {
     }
   }
 
+  get related() {
+    const r = Math.random() * 12;
+    if (r < 6) return this.primary;
+    if (r < 9) return this.secondary;
+    if (r < 11) return this.tertiary;
+    return this.wildcard;
+  }
+
   get color() {
     switch (this.major) {
       case 'water':     return '#88f';
@@ -183,6 +191,12 @@ class MapPoint {
     this.r = r;
   }
 
+  static cartesian(x, y) {
+    const px = x / Map.Scale / 2;
+    const py = y / Map.Scale / 2;
+    return new MapPoint(Math.round(px / 2 - py / 3), Math.round(py * 2 / 3));
+  }
+
   toString() {
     return "(" + this.q + ", " + this.r + ")";
   }
@@ -232,28 +246,43 @@ class MapPoint {
 
 class Map {
   static get Scale() { return 5; }
+  static get Origin() { return new MapPoint(0, 0); }
 
   constructor() {
     this.map = {};
     this.regions = [];
 
-    var origin = new MapPoint(0, 0);
-    this.fill_region(origin, new Terrain('plains'));
+    this.fill_region(Map.Origin, new Terrain('plains'));
 
     while (this.regions.length < 26) {
-      var seed = _random_elem(...this.regions);
-      var check = seed.apply(Direction.Random, 5);
-
-      if (check.dist(origin) < 21 && this.get(check).empty) {
-        var n = Math.floor(Math.random() * 12);
-        var t = n < 6 ? this.get(seed).primary :
-          (n < 9 ? this.get(seed).secondary :
-            (n < 11 ? this.get(seed).tertiary :
-              this.get(seed).wildcard));
-
-        this.fill_region(check, t);
-      }
+      this.add_region();
     }
+  }
+
+  add_region() {
+    var seed = _random_elem(...this.regions);
+    var check = seed.apply(Direction.Random, 5);
+
+    if (check.dist(Map.Origin) < 21 && this.get(check).empty) {
+      var n = Math.floor(Math.random() * 12);
+      var t = this.get(seed).related;
+      this.fill_region(check, t);
+    }
+  }
+
+  expand_region(origin) {
+    var source = origin;
+    var dest = source.apply(Direction.Random);
+
+    while (!this.get(dest).empty) {
+      source = dest;
+      dest = source.apply(Direction.Random);
+    }
+
+    if (dest.dist(origin) > 2) return 0;
+
+    this.set(dest, this.get(source).related);
+    return 1;
   }
 
   fill_region(p, terrain) {
@@ -262,45 +291,9 @@ class Map {
 
     console.log("Filling region " + p + " (" + terrain + ")");
 
-    var full = [
-      new MapPoint(p.q + 0, p.r - 2),
-      new MapPoint(p.q + 1, p.r - 2),
-      new MapPoint(p.q + 2, p.r - 2),
-      new MapPoint(p.q - 1, p.r - 1),
-      new MapPoint(p.q + 0, p.r - 1),
-      new MapPoint(p.q + 1, p.r - 1),
-      new MapPoint(p.q + 2, p.r - 1),
-      new MapPoint(p.q - 2, p.r + 0),
-      new MapPoint(p.q - 1, p.r + 0),
-      new MapPoint(p.q + 1, p.r + 0),
-      new MapPoint(p.q + 2, p.r + 0),
-      new MapPoint(p.q - 2, p.r + 1),
-      new MapPoint(p.q - 1, p.r + 1),
-      new MapPoint(p.q + 0, p.r + 1),
-      new MapPoint(p.q + 1, p.r + 1),
-      new MapPoint(p.q - 2, p.r + 2),
-      new MapPoint(p.q - 1, p.r + 2),
-      new MapPoint(p.q + 0, p.r + 2)
-    ];
-
-    // shuffle the array
-    var ci = full.length;
-    while (ci != 0) {
-      var ri = Math.floor(Math.random() * ci);
-      --ci;
-
-      var t = full[ci];
-      full[ci] = full[ri];
-      full[ri] = t;
-    }
-
-    for (var i = 0; i < full.length; ++i) {
-      var t = i < 9 ? terrain.primary :
-        (i < 15 ? terrain.secondary :
-          (Math.random() < 0.5 ?
-            terrain.tertiary : terrain.wildcard));
-
-      this.set(full[i], t);
+    var count = 1;
+    while (count < 19) {
+      count += this.expand_region(p);
     }
 
     var edges = [
@@ -354,6 +347,10 @@ class Map {
   set(p, terrain) {
     if (!this.map[p.r]) this.map[p.r] = {};
     this.map[p.r][p.q] = terrain;
+  }
+
+  region(p) {
+    return new MapPoint(Math.floor(p.q / 5) * 5, Math.floor(p.r / 5) * 5);
   }
 
   draw(c) {
@@ -416,3 +413,16 @@ var draw = function() {
   window.requestAnimationFrame(draw);
 };
 window.requestAnimationFrame(draw);
+
+document.getElementById('c').addEventListener('mousemove', function(e) {
+  const px = e.pageX - this.offsetLeft - 500;
+  const py = e.pageY - this.offsetTop - 500;
+
+  const p = MapPoint.cartesian(px, py);
+
+  var info = 'Cell:    ' + p + "\n";
+  info    += 'Terrain: ' + map.get(p) + "\n";
+  info    += 'Region:  ' + map.region(p) + "\n";
+
+  document.getElementById('data').innerText = info;
+});

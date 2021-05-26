@@ -11,3 +11,11 @@ canvas {
   border: 1px solid #ddd;
   margin: auto;
 }
+
+pre {
+  width: 1000px;
+  height: 5em;
+  margin: auto;
+  padding: 2em;
+  text-align: left;
+}
