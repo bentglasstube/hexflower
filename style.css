@@ -10,10 +10,17 @@ form {
   margin: 1em;
 }
 
-canvas {
+.container {
+  width: 1000px;
+  height: 1000px;
+  overflow: auto;
   background: #000;
   border: 1px solid #ddd;
   margin: auto;
+}
+
+canvas {
+  display: block;
 }
 
 pre {
