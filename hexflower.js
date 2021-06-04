@@ -185,6 +185,39 @@ class Direction {
   }
 }
 
+class Rect {
+  constructor(x, y, w, h) {
+    this.x = x;
+    this.y = y;
+    this.width = w;
+    this.height = h;
+  }
+
+  get top() { return this.y; }
+  get left() { return this.x; }
+  get right() { return this.x + this.width; }
+  get bottom() { return this.y + this.height; }
+
+  set top(t) { this.y = t; }
+  set left(l) { this.x = l; }
+  set right(r) { this.width = r - this.x; }
+  set bottom(b) { this.height = b - this.y; }
+
+  get center() {
+    return {
+      x: this.x + this.width / 2,
+      y: this.y + this.height / 2,
+    }
+  }
+
+  expand(other) {
+    if (other.top    < this.top   ) this.top    = other.top   ;
+    if (other.left   < this.left  ) this.left   = other.left  ;
+    if (other.right  > this.right ) this.right  = other.right ;
+    if (other.bottom > this.bottom) this.bottom = other.bottom;
+  }
+}
+
 class MapPoint {
   constructor(q, r) {
     this.q = q;
@@ -241,6 +274,16 @@ class MapPoint {
       x: this.q * 4 * Map.Scale + this.r * 2 * Map.Scale,
       y: this.r * 3 * Map.Scale,
     };
+  }
+
+  get bounds() {
+    const c = this.center;
+    return new Rect(
+      c.x - 2 * Map.Scale,
+      c.y - 2 * Map.Scale,
+      4 * Map.Scale,
+      4 * Map.Scale
+    );
   }
 }
 
@@ -369,6 +412,19 @@ class Map {
     return new MapPoint(Math.floor(p.q / 5) * 5, Math.floor(p.r / 5) * 5);
   }
 
+  get bounds() {
+    var extent = new Rect(0, 0, 0, 0);
+
+    for (var r = -99; r <= 99; ++r) {
+      for (var q = -99; q <= 99; ++q) {
+        const p = new MapPoint(q, r);
+        if (this.get(p) != 'none') extent.expand(p.bounds);
+      }
+    }
+
+    return extent;
+  }
+
   draw(c) {
     var context = c.getContext('2d');
 
@@ -381,6 +437,10 @@ class Map {
     for (var i = 0; i < this.regions.length; ++i) {
       this.draw_region(context, this.regions[i]);
     }
+
+    var x = this.bounds;
+    context.strokeStyle = '#ccc';
+    context.strokeRect(x.x + 500, x.y + 500, x.width, x.height);
   }
 
   draw_cell(context, p) {
