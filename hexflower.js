@@ -521,7 +521,8 @@ document.getElementById('c').addEventListener('mousemove', function(e) {
 
   const p = MapPoint.cartesian(px, py);
 
-  var info = 'Cell:    ' + p + "\n";
+  var info = 'Pos:     ' + px + ', ' + py + "\n";
+  info    += 'Cell:    ' + p + "\n";
   info    += 'Terrain: ' + map.get(p) + "\n";
   info    += 'Region:  ' + map.region(p) + "\n";
 
