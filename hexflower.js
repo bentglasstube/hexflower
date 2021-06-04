@@ -306,6 +306,19 @@ class Map {
     }
   }
 
+  finish() {
+    while (this.regions.length < 26) {
+      while (this.current_region) {
+        this.fill_region_step();
+      }
+      this.add_region();
+    }
+
+    while (this.current_region) {
+      this.fill_region_step();
+    }
+  }
+
   add_region() {
     var seed = _random_elem(...this.regions);
     var check = seed.apply(Direction.Random, 5);
@@ -493,12 +506,11 @@ var seed = getParam('seed', 'hexflower');
 var rng = new Random(seed);
 var map = new Map();
 var draw = function() {
-  map.update();
+  map.finish();
   map.draw(document.getElementById('c'));
   window.requestAnimationFrame(draw);
 };
 window.requestAnimationFrame(draw);
-
 
 document.getElementById('s').value = seed;
 
