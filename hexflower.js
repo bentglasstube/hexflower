@@ -457,20 +457,21 @@ class Map {
   }
 
   draw_cell(context, p) {
-    const cx = p.q * 4 * Map.Scale + p.r * 2 * Map.Scale + 500;
-    const cy = p.r * 3 * Map.Scale + 500;
+    const c = p.center;
+    c.x += 500;
+    c.y += 500;
 
     context.lineWidth = 1;
     context.strokeStyle = '#000';
     context.fillStyle = this.get(p).color;
 
     context.beginPath();
-    context.moveTo(cx, cy - 2 * Map.Scale);
-    context.lineTo(cx + 2 * Map.Scale, cy - Map.Scale);
-    context.lineTo(cx + 2 * Map.Scale, cy + Map.Scale);
-    context.lineTo(cx, cy + 2 * Map.Scale);
-    context.lineTo(cx - 2 * Map.Scale, cy + Map.Scale);
-    context.lineTo(cx - 2 * Map.Scale, cy - Map.Scale);
+    context.moveTo(c.x, c.y - 2 * Map.Scale);
+    context.lineTo(c.x + 2 * Map.Scale, c.y - Map.Scale);
+    context.lineTo(c.x + 2 * Map.Scale, c.y + Map.Scale);
+    context.lineTo(c.x, c.y + 2 * Map.Scale);
+    context.lineTo(c.x - 2 * Map.Scale, c.y + Map.Scale);
+    context.lineTo(c.x - 2 * Map.Scale, c.y - Map.Scale);
     context.closePath();
 
     if (Map.Scale > 2) context.stroke();
