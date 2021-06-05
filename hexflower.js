@@ -1,4 +1,4 @@
-function _random_elem() {
+function _randomElem() {
   return arguments[Math.floor(rng.random() * arguments.length)];
 }
 
@@ -9,7 +9,7 @@ class Terrain {
   }
 
   static get Random() {
-    return new Terrain(_random_elem(
+    return new Terrain(_randomElem(
       'water', 'swamp', 'desert',
       'plains', 'forest', 'hills',
       'mountains',
@@ -91,27 +91,27 @@ class Terrain {
   get wildcard() {
     switch (this.major) {
       case 'water':
-        return new Terrain(_random_elem('swamp', 'desert', 'hills'));
+        return new Terrain(_randomElem('swamp', 'desert', 'hills'));
 
       case 'swamp':
         return new Terrain('water');
 
       case 'desert':
-        return new Terrain(_random_elem('water', 'mountains'));
+        return new Terrain(_randomElem('water', 'mountains'));
 
       case 'plains':
-        return new Terrain(_random_elem('water', 'swamp', 'desert'));
+        return new Terrain(_randomElem('water', 'swamp', 'desert'));
 
       case 'forest':
         return rng.random() < 0.66 ?
-          new Terrain(_random_elem('water', 'swamp')) :
+          new Terrain(_randomElem('water', 'swamp')) :
           rng.random() < 0.66 ?
             new Terrain('forest', 'mountains') :
             new Terrain('mountains');
 
       case 'hills':
         return rng.random() < 0.66 ?
-          new Terrain(_random_elem('water', 'desert')) :
+          new Terrain(_randomElem('water', 'desert')) :
           rng.random() < 0.33 ?
             new Terrain('forest', 'hills') :
             new Terrain('forest');
@@ -166,7 +166,7 @@ class Direction {
   static get SE() { return new Direction('SE'); }
   static get W()  { return new Direction('W');  }
   static get Random() {
-    return new Direction(_random_elem('NW', 'NE', 'E', 'SW', 'SE', 'W'));
+    return new Direction(_randomElem('NW', 'NE', 'E', 'SW', 'SE', 'W'));
   }
 
   toString() {
@@ -198,8 +198,8 @@ class Rect {
   get right() { return this.x + this.width; }
   get bottom() { return this.y + this.height; }
 
-  set top(t) { this.y = t; }
-  set left(l) { this.x = l; }
+  set top(t) { this.height += this.y - t; this.y = t; }
+  set left(l) { this.width += this.x - l; this.x = l; }
   set right(r) { this.width = r - this.x; }
   set bottom(b) { this.height = b - this.y; }
 
@@ -225,9 +225,26 @@ class MapPoint {
   }
 
   static cartesian(x, y) {
-    const px = x / Map.Scale / 2;
-    const py = y / Map.Scale / 2;
-    return new MapPoint(Math.round(px / 2 - py / 3), Math.round(py * 2 / 3));
+    const q = (Math.sqrt(3) / 3 * x - y / 3) / Map.Scale / 2;
+    const r = (2 * y / 3) / Map.Scale / 2;
+
+    return MapPoint.round(q, r);
+  }
+
+  static round(q, r) {
+    const s = -q - r;
+
+    const rq = Math.round(q);
+    const rr = Math.round(r);
+    const rs = Math.round(s);
+
+    const dq = Math.abs(q - rq);
+    const dr = Math.abs(r - rr);
+    const ds = Math.abs(s - rs);
+
+    if (dq > dr && dq > ds) return new MapPoint(-rr - rs, rr);
+    if (dr > ds) return new MapPoint(rq, -rq - rs);
+    return new MapPoint(rq, rr);
   }
 
   toString() {
@@ -288,49 +305,50 @@ class MapPoint {
 }
 
 class Map {
-  static get Scale() { return 5; }
+  static get Scale() { return 4; }
+  static get RegionCount() { return 26; }
   static get Origin() { return new MapPoint(0, 0); }
 
   constructor() {
     this.map = {};
     this.regions = [];
-
-    this.fill_region(Map.Origin, new Terrain('plains'));
+    this.bounds = Map.Origin.bounds;
+    this.fillRegion(Map.Origin, new Terrain('plains'));
   }
 
   update() {
-    if (this.current_region) {
-      this.fill_region_step();
-    } else if (this.regions.length < 26) {
-      this.add_region();
+    if (this.currentRegion) {
+      this.fillRegionStep();
+    } else if (this.regions.length < Map.RegionCount) {
+      this.addRegion();
     }
   }
 
   finish() {
-    while (this.regions.length < 26) {
-      while (this.current_region) {
-        this.fill_region_step();
+    while (this.regions.length < Map.RegionCount) {
+      while (this.currentRegion) {
+        this.fillRegionStep();
       }
-      this.add_region();
+      this.addRegion();
     }
 
-    while (this.current_region) {
-      this.fill_region_step();
+    while (this.currentRegion) {
+      this.fillRegionStep();
     }
   }
 
-  add_region() {
-    var seed = _random_elem(...this.regions);
+  addRegion() {
+    var seed = _randomElem(...this.regions);
     var check = seed.apply(Direction.Random, 5);
 
     if (check.dist(Map.Origin) < 21 && this.get(check).empty) {
       var n = Math.floor(rng.random() * 12);
       var t = this.get(seed).related;
-      this.fill_region(check, t);
+      this.fillRegion(check, t);
     }
   }
 
-  expand(origin, max_dist) {
+  expand(origin, maxDist) {
     var source = origin;
     var dest = source.apply(Direction.Random);
 
@@ -339,19 +357,19 @@ class Map {
       dest = source.apply(Direction.Random);
     }
 
-    if (dest.dist(origin) > max_dist) return 0;
+    if (dest.dist(origin) > maxDist) return 0;
 
     this.set(dest, this.get(source).related);
     return 1;
   }
 
-  fill_region(p, terrain) {
+  fillRegion(p, terrain) {
     this.set(p, terrain);
     this.regions.push(p);
 
     console.log("Filling region " + p + " (" + terrain + ")");
 
-    this.current_region = p;
+    this.currentRegion = p;
     this.count = 1;
 
     this.edges = [
@@ -370,10 +388,10 @@ class Map {
     ];
   }
 
-  fill_region_step() {
+  fillRegionStep() {
     if (this.count < 19) {
       while (true) {
-        var added = this.expand(this.current_region, 2);
+        var added = this.expand(this.currentRegion, 2);
         this.count += added;
 
         if (added) return;
@@ -381,14 +399,14 @@ class Map {
     }
 
     if (this.edges.length > 0) {
-      this.set_adjacent(this.edges.pop());
+      this.setAdjacent(this.edges.pop());
       return;
     }
 
-    this.current_region = undefined;
+    this.currentRegion = undefined;
   }
 
-  set_adjacent(p) {
+  setAdjacent(p) {
     if (!this.get(p).empty) return;
 
     var adjacent = [
@@ -419,47 +437,39 @@ class Map {
   set(p, terrain) {
     if (!this.map[p.r]) this.map[p.r] = {};
     this.map[p.r][p.q] = terrain;
+    this.bounds.expand(p.bounds);
+
+    var c = document.getElementById('c');
+    c.width = c.width;
+
+    return true;
   }
 
   region(p) {
-    return new MapPoint(Math.floor(p.q / 5) * 5, Math.floor(p.r / 5) * 5);
-  }
-
-  get bounds() {
-    var extent = new Rect(0, 0, 0, 0);
-
-    for (var r = -99; r <= 99; ++r) {
-      for (var q = -99; q <= 99; ++q) {
-        const p = new MapPoint(q, r);
-        if (this.get(p) != 'none') extent.expand(p.bounds);
-      }
-    }
-
-    return extent;
+    return new MapPoint(Math.round(p.q / 5) * 5, Math.round(p.r / 5) * 5);
   }
 
   draw(c) {
+    c.width = this.bounds.width;
+    c.height = this.bounds.height;
+
     var context = c.getContext('2d');
 
-    for (var r = -99; r <= 99; ++r) {
-      for (var q = -99; q <= 99; ++q) {
-        this.draw_cell(context, new MapPoint(q, r));
+    for (const [r, row] of Object.entries(this.map)) {
+      for (const [q, cell] of Object.entries(row)) {
+        this.drawCell(context, new MapPoint(q, r));
       }
     }
 
-    for (var i = 0; i < this.regions.length; ++i) {
-      this.draw_region(context, this.regions[i]);
+    for (const region of this.regions) {
+      this.drawRegion(context, region);
     }
-
-    var x = this.bounds;
-    context.strokeStyle = '#ccc';
-    context.strokeRect(x.x + 500, x.y + 500, x.width, x.height);
   }
 
-  draw_cell(context, p) {
+  drawCell(context, p) {
     const c = p.center;
-    c.x += 500;
-    c.y += 500;
+    c.x -= this.bounds.x;
+    c.y -= this.bounds.y;
 
     context.lineWidth = 1;
     context.strokeStyle = '#000';
@@ -478,9 +488,9 @@ class Map {
     context.fill();
   }
 
-  draw_region(context, p) {
-    const cx = p.q * 4 * Map.Scale + p.r * 2 * Map.Scale + 500;
-    const cy = p.r * 3 * Map.Scale + 500;
+  drawRegion(context, p) {
+    const cx = p.q * 4 * Map.Scale + p.r * 2 * Map.Scale - this.bounds.x;
+    const cy = p.r * 3 * Map.Scale - this.bounds.y;
 
     context.lineWidth = Map.Scale > 2 ? 2 : 1;
     context.strokeStyle = '#000';
@@ -506,18 +516,46 @@ function getParam(name, def='') {
 var seed = getParam('seed', 'hexflower');
 var rng = new Random(seed);
 var map = new Map();
-var draw = function() {
-  map.finish();
-  map.draw(document.getElementById('c'));
-  window.requestAnimationFrame(draw);
+map.finish();
+map.draw(document.getElementById('c'));
+
+function draw() {
+  const DrawScale = 16;
+
+  var canvas = document.getElementById('c');
+
+  const bounds = map.bounds;
+  canvas.width = DrawScale * bounds.width;
+  canvas.height = DrawScale * bounds.height;
+
+  var context = canvas.getContext('2d');
+
+  for (var y = 0; y < bounds.height; ++y) {
+    for (var x = 0; x < bounds.width; ++x) {
+      const px = DrawScale * x, py = DrawScale * y;
+      const mx = bounds.x + x, my = bounds.y + y;
+
+      const t = map.get(MapPoint.cartesian(mx, my))
+
+      if (t != 'none') {
+        context.fillStyle = t.color;
+        context.fillRect(px, py, DrawScale, DrawScale);
+
+        if (DrawScale > 4) {
+          context.strokeStyle = '#000';
+          context.strokeRect(px, py, DrawScale, DrawScale);
+        }
+      }
+    }
+  }
 };
-window.requestAnimationFrame(draw);
+draw();
 
 document.getElementById('s').value = seed;
 
 document.getElementById('c').addEventListener('mousemove', function(e) {
-  const px = e.pageX - this.offsetLeft - 500;
-  const py = e.pageY - this.offsetTop - 500;
+  const px = Math.floor((e.pageX - this.offsetLeft) / 16) + map.bounds.x;
+  const py = Math.floor((e.pageY - this.offsetTop) / 16) + map.bounds.y;
 
   const p = MapPoint.cartesian(px, py);
 
